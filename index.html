@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShipLog — Human Changelog from Git Log</title>
+<style>
+:root { --bg:#0F0F0F; --card:#1A1A1A; --text:#F5F0E6; --muted:#A8A29E; --accent:#22C55E; --border:#2A2A2A; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:2rem 1rem}
+.wrap{max-width:800px;margin:0 auto}
+h1{font-size:2.2rem;font-weight:600;text-align:center}
+.sub{color:var(--muted);text-align:center;margin:0.5rem 0 2rem}
+textarea{width:100%;min-height:180px;background:#111;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:1rem;font-family:ui-monospace,monospace;font-size:.85rem}
+button{background:var(--accent);color:#000;border:none;padding:.7rem 1.2rem;border-radius:10px;font-weight:600;cursor:pointer;margin:.5rem .4rem 0 0}
+button.sec{background:#333;color:var(--text)}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem;margin-top:1.5rem}
+#out{white-space:pre-wrap;line-height:1.5;margin-top:1rem}
+footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:2rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ShipLog</h1>
+  <p class="sub">Paste a git log. Get a clean, human “what I shipped” post. No devspeak.</p>
+  <textarea id="log" placeholder="Paste output of: git log --oneline --since='1 week ago'&#10;&#10;or any commit list"></textarea>
+  <div>
+    <button id="gen">Generate</button>
+    <button id="copy" class="sec">Copy</button>
+  </div>
+  <div class="panel" id="panel" style="display:none">
+    <div id="out"></div>
+  </div>
+  <footer>Client-side · MIT</footer>
+</div>
+<script>
+const log=document.getElementById('log'), out=document.getElementById('out'), panel=document.getElementById('panel');
+document.getElementById('gen').onclick=()=>{
+  const text=log.value.trim();
+  if(!text) return;
+  const lines=text.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const commits=lines.map(l=>{
+    const m=l.match(/^([a-f0-9]+)\s+(.+)/i);
+    return m?{hash:m[1],msg:m[2]}:{msg:l};
+  });
+  let md='# What I shipped\n\n';
+  const groups={feat:[],fix:[],chore:[],other:[]};
+  commits.forEach(c=>{
+    const m=c.msg.toLowerCase();
+    if(m.startsWith('feat')||m.includes('add')||m.includes('new')) groups.feat.push(c.msg);
+    else if(m.startsWith('fix')||m.includes('bug')||m.includes('fix')) groups.fix.push(c.msg);
+    else if(m.startsWith('chore')||m.includes('deps')||m.includes('update')) groups.chore.push(c.msg);
+    else groups.other.push(c.msg);
+  });
+  if(groups.feat.length) md+='## New\n'+groups.feat.map(m=>'- '+clean(m)).join('\n')+'\n\n';
+  if(groups.fix.length) md+='## Fixed\n'+groups.fix.map(m=>'- '+clean(m)).join('\n')+'\n\n';
+  if(groups.chore.length) md+='## Improved\n'+groups.chore.map(m=>'- '+clean(m)).join('\n')+'\n\n';
+  if(groups.other.length) md+='## Other\n'+groups.other.map(m=>'- '+clean(m)).join('\n')+'\n\n';
+  md+='---\n*Generated from '+commits.length+' commits*';
+  out.textContent=md;
+  panel.style.display='block';
+};
+function clean(msg){
+  return msg.replace(/^(feat|fix|chore|docs|style|refactor|perf|test)(\([^)]+\))?:\s*/i,'')
+            .replace(/^[a-f0-9]{7,}\s*/i,'')
+            .replace(/\.$/,'');
+}
+document.getElementById('copy').onclick=()=>navigator.clipboard.writeText(out.textContent);
+</script>
+</body>
+</html>
